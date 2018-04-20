@@ -32,7 +32,10 @@ deactivate_trigger = 0.9
 trigger_buffer = 3
 trigger_buffer_cutoff = 1       
 wait = 0.05      
-maxi_buffer = 20
+maxi_buffer = 40
+maxi_cutoff = 20
+cooldown = 10
+min_dif = 20
 #########
 
 
@@ -42,17 +45,23 @@ def avg(array):
 
 hit = False;
 last_distances = [400] * maxi_buffer
+last_hit = 0
 def check(distance):
     global hit
     global last_distances
+    global last_hit
     
     last_distances = last_distances[1:] + [distance]
 
     average = avg(sorted(last_distances[-trigger_buffer:])[trigger_buffer_cutoff:-trigger_buffer_cutoff])
-    maxi = max(last_distances)
-    
-    if not(hit) and average < activate_trigger * maxi:
+    maxi = max(sorted(last_distances)[:-maxi_cutoff])
+
+    if last_hit > 0:
+        last_hit = last_hit - 1
+        
+    if last_hit == 0 and not(hit) and average < min(activate_trigger * maxi, maxi - min_dif):
         hit = True
+        last_hit = cooldown
         return True
     elif hit and average > deactivate_trigger * maxi:
         hit = False
@@ -67,6 +76,7 @@ def pulse():
 
 
 people = 0
+last_print = time.time()
 try:
     while True:
         pulse()
@@ -82,12 +92,14 @@ try:
         pulse_duration = end - start
 
         distance = pulse_duration * 17150
-        
-        #print(round(distance, 2))
+
+        #if time.time() - last_print > 0:
+        #    print(round(distance, 2))
+        #    last_print = time.time()
 
         if check(distance):
             people = people + 1
-            print("% Someone passed by: #", people)
+            #print("% Someone passed by: #", people)
             client.publish("trigger", "")
 
         time.sleep(wait)  
